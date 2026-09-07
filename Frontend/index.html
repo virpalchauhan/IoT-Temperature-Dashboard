@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>IoT Temperature Dashboard</title>
+</head>
+
+<body>
+
+    <h1>IoT Temperature Dashboard</h1>
+
+    <h2>
+        Temperature:
+        <span id="temperature">--</span> °C
+    </h2>
+
+    <p id="status">Connecting...</p>
+
+    <script>
+
+        const socket = new WebSocket("ws://localhost:8080");
+
+        socket.onopen = () => {
+
+            console.log("Connected to WebSocket Server");
+
+            document.getElementById("status").innerText =
+                "Connected";
+
+        };
+
+        socket.onmessage = (event) => {
+
+            console.log("Message from server:", event.data);
+
+            document.getElementById("temperature").innerText =
+                event.data;
+
+        };
+
+        socket.onclose = () => {
+
+            document.getElementById("status").innerText =
+                "Disconnected";
+
+        };
+
+    </script>
+
+</body>
+</html>
