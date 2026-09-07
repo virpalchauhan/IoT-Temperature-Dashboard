@@ -5,49 +5,496 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>IoT Temperature Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
 
-    <h1>IoT Temperature Dashboard</h1>
+   <div class="container">
 
-    <h2>
-        Temperature:
-        <span id="temperature">--</span> °C
-    </h2>
+        <div class="header">
+            <h1>🌡️ IoT Temperature Dashboard</h1>
+            <p>Real-time temperature monitoring system</p>
+        </div>
 
-    <p id="status">Connecting...</p>
+        <div class="temperature-card">
+<div class="kpi-container">
+
+    <div class="kpi-card">
+        <h3>Current Temperature</h3>
+        <div class="kpi-value">
+            <span id="kpiCurrentTemperature">--</span> °C
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <h3>Highest Temperature</h3>
+        <div class="kpi-value">
+            <span id="highestTemperature">--</span> °C
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <h3>Lowest Temperature</h3>
+        <div class="kpi-value">
+            <span id="lowestTemperature">--</span> °C
+        </div>
+    </div>
+
+</div>
+            <h2>Current Temperature</h2>
+
+            <div class="temperature">
+                <span id="temperature">--</span> °C
+            </div>
+
+            <p id="status" class="status">
+                Connecting...
+            </p>
+
+        </div>
+<div class="chart-card">
+
+    <h2>Temperature Graph</h2>
+
+    <canvas id="temperatureChart"></canvas>
+
+</div>
+        <div class="history-card">
+
+            <h2>Temperature History</h2>
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>Number</th>
+                        <th>Temperature</th>
+                        <th>Recorded At</th>
+                    </tr>
+                </thead>
+
+                <tbody id="historyTable">
+                </tbody>
+
+            </table>
+            <div id="pagination" class="pagination"></div>
+
+        </div>
+
+    </div>
 
     <script>
 
-        const socket = new WebSocket("ws://localhost:8080");
+    let temperatureHistory = [];
+    let currentPage = 1;
+    const recordsPerPage = 10;
 
-        socket.onopen = () => {
+    let temperatureChart = null;
 
-            console.log("Connected to WebSocket Server");
 
-            document.getElementById("status").innerText =
-                "Connected";
+    // ========================================
+    // Load Temperature History
+    // ========================================
 
-        };
+    async function loadTemperatureHistory() {
 
-        socket.onmessage = (event) => {
+        try {
 
-            console.log("Message from server:", event.data);
+            const response = await fetch(
+                "http://localhost:3000/temperature-history"
+            );
 
-            document.getElementById("temperature").innerText =
-                event.data;
+            temperatureHistory = await response.json();
 
-        };
+            currentPage = 1;
 
-        socket.onclose = () => {
+            updateKPI();
 
-            document.getElementById("status").innerText =
-                "Disconnected";
+            showTemperatureHistory();
 
-        };
+            updateTemperatureChart(temperatureHistory);
 
-    </script>
+        }
+        catch (error) {
+
+            console.log("Failed to load temperature history");
+            console.log(error);
+
+        }
+    }
+
+
+    // ========================================
+    // Update KPI
+    // ========================================
+
+    function updateKPI() {
+
+        if (temperatureHistory.length === 0) {
+            return;
+        }
+
+        const temperatures = temperatureHistory.map(
+            reading => Number(reading.Temperature)
+        );
+
+        const highest = Math.max(...temperatures);
+        const lowest = Math.min(...temperatures);
+
+
+        document.getElementById("highestTemperature").innerText =
+            highest.toFixed(2);
+
+        document.getElementById("lowestTemperature").innerText =
+            lowest.toFixed(2);
+
+    }
+
+
+    // ========================================
+    // History Table
+    // ========================================
+
+    function showTemperatureHistory() {
+
+        const table =
+            document.getElementById("historyTable");
+
+        table.innerHTML = "";
+
+
+        const startIndex =
+            (currentPage - 1) * recordsPerPage;
+
+        const endIndex =
+            startIndex + recordsPerPage;
+
+
+        const pageData =
+            temperatureHistory.slice(
+                startIndex,
+                endIndex
+            );
+
+
+        pageData.forEach((reading, index) => {
+
+            const row =
+                document.createElement("tr");
+
+            const count =
+                startIndex + index + 1;
+
+
+            row.innerHTML = `
+                <td>${count}</td>
+
+                <td>
+                    ${Number(reading.Temperature).toFixed(2)} °C
+                </td>
+
+                <td>
+                    ${new Date(
+                        reading.RecordedAt
+                    ).toLocaleString()}
+                </td>
+            `;
+
+
+            table.appendChild(row);
+
+        });
+
+
+        createPagination();
+
+    }
+
+
+    // ========================================
+    // Pagination
+    // ========================================
+
+    function createPagination() {
+
+        const pagination =
+            document.getElementById("pagination");
+
+        pagination.innerHTML = "";
+
+
+        const totalPages =
+            Math.ceil(
+                temperatureHistory.length /
+                recordsPerPage
+            );
+
+
+        for (
+            let page = 1;
+            page <= totalPages;
+            page++
+        ) {
+
+            const button =
+                document.createElement("button");
+
+
+            button.innerText = page;
+
+            button.classList.add(
+                "page-button"
+            );
+
+
+            if (page === currentPage) {
+
+                button.classList.add(
+                    "active"
+                );
+
+            }
+
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    currentPage = page;
+
+                    showTemperatureHistory();
+
+                }
+            );
+
+
+            pagination.appendChild(button);
+
+        }
+
+    }
+
+
+    // ========================================
+    // Temperature Graph
+    // ========================================
+
+    function updateTemperatureChart(history) {
+
+        const graphData =
+            history.slice().reverse();
+
+
+        const labels =
+            graphData.map(reading =>
+                new Date(
+                    reading.RecordedAt
+                ).toLocaleTimeString()
+            );
+
+
+        const temperatures =
+            graphData.map(reading =>
+                Number(reading.Temperature)
+            );
+
+
+        const ctx =
+            document.getElementById(
+                "temperatureChart"
+            );
+
+
+        // Chart already exists
+        if (temperatureChart !== null) {
+
+            temperatureChart.data.labels =
+                labels;
+
+            temperatureChart.data.datasets[0].data =
+                temperatures;
+
+            temperatureChart.update();
+
+            return;
+
+        }
+
+
+        // Create chart first time
+        temperatureChart = new Chart(
+            ctx,
+            {
+
+                type: "line",
+
+                data: {
+
+                    labels: labels,
+
+                    datasets: [{
+
+                        label: "Temperature (°C)",
+
+                        data: temperatures,
+
+                        borderWidth: 2,
+
+                        tension: 0.3,
+
+                        fill: false
+
+                    }]
+
+                },
+
+                options: {
+
+                    responsive: true,
+
+                    plugins: {
+
+                        legend: {
+                            display: true
+                        }
+
+                    },
+
+                    scales: {
+
+                        y: {
+
+                            title: {
+
+                                display: true,
+
+                                text: "Temperature (°C)"
+
+                            }
+
+                        },
+
+                        x: {
+
+                            title: {
+
+                                display: true,
+
+                                text: "Time"
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+        );
+
+    }
+
+
+    // ========================================
+    // WebSocket
+    // ========================================
+
+    const socket =
+        new WebSocket(
+            "ws://localhost:8080"
+        );
+
+
+    socket.onopen = () => {
+
+        console.log(
+            "Connected to WebSocket Server"
+        );
+
+        document.getElementById(
+            "status"
+        ).innerText = "Connected";
+
+    };
+
+
+    socket.onmessage = (event) => {
+
+        console.log(
+            "Message from server:",
+            event.data
+        );
+
+
+        const data =
+            JSON.parse(event.data);
+
+
+        // Current Temperature
+        document.getElementById(
+            "temperature"
+        ).innerText =
+            Number(data.temperature).toFixed(2);
+
+
+        // Current Temperature KPI
+        document.getElementById(
+            "kpiCurrentTemperature"
+        ).innerText =
+            Number(data.temperature).toFixed(2);
+
+
+        // Highest Temperature
+        document.getElementById(
+            "highestTemperature"
+        ).innerText =
+            Number(data.highest).toFixed(2);
+
+
+        // Lowest Temperature
+        document.getElementById(
+            "lowestTemperature"
+        ).innerText =
+            Number(data.lowest).toFixed(2);
+
+
+        // Update history
+        temperatureHistory =
+            data.history;
+
+
+        // Table
+        showTemperatureHistory();
+
+
+        // Graph
+        updateTemperatureChart(
+            data.history
+        );
+
+    };
+
+
+    socket.onclose = () => {
+
+        document.getElementById(
+            "status"
+        ).innerText =
+            "Disconnected";
+
+    };
+
+
+    // ========================================
+    // Initial Load
+    // ========================================
+
+    loadTemperatureHistory();
+
+</script>
 
 </body>
 </html>

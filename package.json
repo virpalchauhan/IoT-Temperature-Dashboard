@@ -12,6 +12,8 @@
   "type": "commonjs",
   "dependencies": {
     "mqtt": "^5.15.2",
+    "msnodesqlv8": "^5.3.0",
+    "mssql": "^12.7.0",
     "ws": "^8.21.3"
   }
 }
